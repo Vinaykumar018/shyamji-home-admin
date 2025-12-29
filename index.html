@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Panel | Shyam Ji Home Help</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+  <style>
+    body { background-color: #0a0a0a; font-family: 'Inter', sans-serif; }
+    .glass-card {
+      background: rgba(22, 22, 22, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(250, 204, 21, 0.1);
+    }
+    .input-field {
+      background: #111;
+      border: 1px solid #333;
+      transition: all 0.3s ease;
+    }
+    .input-field:focus {
+      border-color: #fbbf24;
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+      transition: transform 0.2s ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .table-container::-webkit-scrollbar { height: 6px; }
+    .table-container::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+  </style>
+</head>
+
+<body class="text-gray-200 min-h-screen">
+
+<script>
+const API_BASE = "https://shyamji-home-help-backend.onrender.com";
+
+// Toast Helper
+const notify = (msg, type = "success") => {
+  Toastify({
+    text: msg,
+    duration: 3000,
+    gravity: "top",
+    position: "right",
+    style: {
+      background: type === "success" ? "linear-gradient(to right, #00b09b, #96c93d)" : "linear-gradient(to right, #ff5f6d, #ffc371)",
+      borderRadius: "8px",
+      fontSize: "14px"
+    }
+  }).showToast();
+};
+</script>
+
+<div id="loginBox" class="min-h-screen flex items-center justify-center p-4">
+  <div class="glass-card p-8 rounded-2xl w-full max-w-sm animate__animated animate__fadeInDown">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="text-yellow-500 text-3xl">🔒</span>
+      </div>
+      <h2 class="text-3xl font-extrabold text-white">Admin Login</h2>
+      <p class="text-gray-500 text-sm mt-2">Shyam Ji Home Help Management</p>
+    </div>
+
+    <div class="space-y-4">
+      <input id="email" type="email" placeholder="Email Address"
+        class="input-field w-full p-3 rounded-lg focus:outline-none">
+
+      <input id="password" type="password" placeholder="Password"
+        class="input-field w-full p-3 rounded-lg focus:outline-none">
+
+      <button onclick="login()" id="loginBtn"
+        class="btn-primary w-full text-black font-bold py-3 rounded-lg mt-4 shadow-lg shadow-yellow-500/20">
+        Sign In
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="dashboard" class="hidden min-h-screen p-4 md:p-8 animate__animated animate__fadeIn">
+  
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-white">Dashboard</h1>
+      <p class="text-gray-400">Welcome back, Admin</p>
+    </div>
+    <button onclick="logout()"
+      class="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-300">
+      Logout
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+    <div class="glass-card p-6 rounded-2xl animate__animated animate__zoomIn">
+      <p class="text-gray-400 text-sm font-medium uppercase tracking-wider">Total Visitors</p>
+      <div class="flex items-center gap-4 mt-2">
+        <h2 id="visitorCount" class="text-5xl font-black text-yellow-400">0</h2>
+        <span class="text-green-500 text-sm">↑ Live</span>
+      </div>
+    </div>
+    <div class="glass-card p-6 rounded-2xl border-dashed border-gray-700 flex items-center justify-center">
+       <p class="text-gray-600 italic">More insights coming soon...</p>
+    </div>
+  </div>
+
+  <div class="animate__animated animate__fadeInUp">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-white">Contact Leads</h2>
+        <button onclick="loadContacts()" class="text-yellow-500 text-sm hover:underline">Refresh List</button>
+    </div>
+
+    <div class="table-container overflow-x-auto rounded-xl border border-gray-800 shadow-2xl">
+      <table class="w-full text-left">
+        <thead class="bg-[#111] text-gray-400 uppercase text-xs font-bold tracking-widest">
+          <tr>
+            <th class="p-4">Name</th>
+            <th class="p-4">Phone</th>
+            <th class="p-4">Service</th>
+            <th class="p-4">Message</th>
+            <th class="p-4 text-right">Date</th>
+          </tr>
+        </thead>
+        <tbody id="leadTable" class="divide-y divide-gray-800">
+            </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= SESSION CHECK ================= */
+if (localStorage.getItem("isAdmin") === "true") {
+  showDashboard();
+}
+
+/* ================= LOGIN ================= */
+async function login() {
+  const emailVal = document.getElementById("email").value.trim();
+  const passVal = document.getElementById("password").value.trim();
+  const btn = document.getElementById("loginBtn");
+
+  if (!emailVal || !passVal) {
+    notify("Please fill all fields", "error");
+    return;
+  }
+
+  btn.innerText = "Authenticating...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailVal, password: passVal })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      notify("Login Successful! Redirecting...");
+      setTimeout(() => {
+          localStorage.setItem("isAdmin", "true");
+          showDashboard();
+      }, 1000);
+    } else {
+      notify("Invalid credentials", "error");
+    }
+  } catch (err) {
+    notify("Server Error. Please try later.", "error");
+  } finally {
+    btn.innerText = "Sign In";
+    btn.disabled = false;
+  }
+}
+
+/* ================= DASHBOARD UI ================= */
+function showDashboard() {
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+  loadVisitors();
+  loadContacts();
+}
+
+async function loadVisitors() {
+  try {
+    const res = await fetch(`${API_BASE}/api/visitor/count`);
+    const data = await res.json();
+    document.getElementById("visitorCount").innerText = data.count || 0;
+  } catch (err) { console.error(err); }
+}
+
+async function loadContacts() {
+  try {
+    const res = await fetch(`${API_BASE}/api/contact`);
+    const data = await res.json();
+    const table = document.getElementById("leadTable");
+    table.innerHTML = "";
+
+    if (!data.length) {
+      table.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-gray-500">No leads found in database.</td></tr>`;
+      return;
+    }
+
+    data.reverse().forEach((item, index) => {
+      const date = new Date(item.createdAt).toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'short', year: 'numeric'
+      });
+      table.innerHTML += `
+        <tr class="hover:bg-yellow-500/5 transition-colors group">
+          <td class="p-4 font-semibold text-white">${item.name}</td>
+          <td class="p-4 text-yellow-500 font-mono">${item.phone}</td>
+          <td class="p-4"><span class="bg-gray-800 px-2 py-1 rounded text-xs text-gray-300">${item.service}</span></td>
+          <td class="p-4 text-gray-400 max-w-xs truncate">${item.message || "-"}</td>
+          <td class="p-4 text-right text-gray-500 text-sm">${date}</td>
+        </tr>
+      `;
+    });
+  } catch (err) {
+    notify("Failed to fetch leads", "error");
+  }
+}
+
+function logout() {
+  notify("Logging out...");
+  setTimeout(() => {
+      localStorage.removeItem("isAdmin");
+      location.reload();
+  }, 800);
+}
+</script>
+
+</body>
+</html>
